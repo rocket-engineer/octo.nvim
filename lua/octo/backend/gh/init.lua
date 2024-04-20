@@ -1,5 +1,6 @@
 local cli = require "octo.backend.gh.cli"
 local commands = require "octo.backend.gh.commands"
+local telescope_commands = require "octo.backend.gh.telescope-commands"
 
 local M = {}
 
@@ -61,6 +62,22 @@ M.functions = {
   ["util_get_pr_for_curr_branch"] = commands.util_get_pr_for_curr_branch,
   ["util_get_user_id"] = commands.util_get_user_id,
   ["util_get_label_id"] = commands.util_get_label_id,
+  ["get_user_name"] = commands.get_user_name,
+  ["telescope_default_issue"] = telescope_commands.telescope_default_issue,
+  ["telescope_default_commit"] = telescope_commands.telescope_default_commit,
+  ["telescope_issues"] = telescope_commands.telescope_issues,
+  ["telescope_gists"] = telescope_commands.telescope_gists,
+  ["telescope_pull_requests"] = telescope_commands.telescope_pull_requests,
+  ["telescope_commits"] = telescope_commands.telescope_commits,
+  ["telescope_review_commits"] = telescope_commands.telescope_review_commits,
+  ["telescope_changed_files"] = telescope_commands.telescope_changed_files,
+  ["telescope_search"] = telescope_commands.telescope_search,
+  ["telescope_select_target_project_column"] = telescope_commands.telescope_select_target_project_column,
+  ["telescope_select_label"] = telescope_commands.telescope_select_label,
+  ["telescope_select_assigned_label"] = telescope_commands.telescope_select_assigned_label,
+  ["telescope_get_users"] = telescope_commands.telescope_get_users,
+  ["telescope_select_assignee"] = telescope_commands.telescope_select_assignee,
+  ["telescope_repos"] = telescope_commands.telescope_repos,
 }
 
 return M

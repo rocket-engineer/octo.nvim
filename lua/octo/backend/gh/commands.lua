@@ -1734,4 +1734,14 @@ function M.util_get_label_id(repo)
   }
 end
 
+
+-- -----------------------------------------------------------------------------
+-- Functions for octo/pickers/telescope/provider.lua
+-- -----------------------------------------------------------------------------
+
+---@param remote_hostname string
+function M.get_user_name(remote_hostname)
+  return cli.get_user_name(remote_hostname)
+end
+
 return M
