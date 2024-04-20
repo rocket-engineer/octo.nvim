@@ -25,8 +25,7 @@ function M.setup(user_config)
   end
 
   config.setup(user_config or {})
-  if not vim.fn.executable(config.values.gh_cmd) then
-    utils.error("gh executable not found using path: " .. config.values.gh_cmd)
+  if not backend.available_executable() then
     return
   end
 
