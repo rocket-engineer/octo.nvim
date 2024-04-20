@@ -325,7 +325,7 @@ function M.checkout_pr_sync(pr_number)
   func(pr_number)
 end
 
----Mergest a PR b number
+---Merges a PR number
 function M.merge_pr(pr_number)
   if not Job then
     return

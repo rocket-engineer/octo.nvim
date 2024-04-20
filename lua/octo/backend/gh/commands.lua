@@ -1458,7 +1458,7 @@ end
 -- -----------------------------------------------------------------------------
 
 ---@param pr_id string
----@param cb any
+---@param cb function
 function M.review_start_review_mutation(pr_id, cb)
   local query = graphql("start_review_mutation", pr_id)
 
@@ -1476,7 +1476,7 @@ function M.review_start_review_mutation(pr_id, cb)
 end
 
 ---@param pull_request PullRequest
----@param cb any
+---@param cb function
 function M.review_retrieve(pull_request, cb)
   local query = graphql("pending_review_threads_query", pull_request.owner, pull_request.name, pull_request.number)
 
@@ -1717,7 +1717,7 @@ end
 function M.util_get_user_id(login)
   local query = graphql("user_query", login)
 
- return cli.run {
+  return cli.run {
     args = { "api", "graphql", "-f", string.format("query=%s", query) },
     mode = "sync",
   }
