@@ -50,6 +50,17 @@ M.functions = {
   ["review_retrieve"] = commands.review_retrieve,
   ["review_discard"] = commands.review_discard,
   ["review_submit"] = commands.review_submit,
+  ["util_checkout_pr"] = commands.util_checkout_pr,
+  ["util_checkout_pr_sync"] = commands.util_checkout_pr_sync,
+  ["util_merge_pr"] = commands.util_merge_pr,
+  ["util_get_repo_iid"] = commands.util_get_repo_iid,
+  ["util_get_repo_info"] = commands.util_get_repo_info,
+  ["util_get_repo_templates"] = commands.util_get_repo_templates,
+  ["util_get_file_contents"] = commands.util_get_file_contents,
+  ["util_fork"] = commands.util_fork,
+  ["util_get_pr_for_curr_branch"] = commands.util_get_pr_for_curr_branch,
+  ["util_get_user_id"] = commands.util_get_user_id,
+  ["util_get_label_id"] = commands.util_get_label_id,
 }
 
 return M

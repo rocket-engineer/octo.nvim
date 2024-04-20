@@ -1563,4 +1563,175 @@ function M.review_submit(id, layout, event)
   }
 end
 
+
+-- -----------------------------------------------------------------------------
+-- Functions for octo/utils.lua
+-- -----------------------------------------------------------------------------
+
+---@param pr_number integer
+function M.util_checkout_pr(pr_number)
+  Job:new({
+    enable_recording = true,
+    command = "gh",
+    args = { "pr", "checkout", pr_number },
+    on_exit = vim.schedule_wrap(function()
+      local output = vim.fn.system "git branch --show-current"
+      utils.info("Switched to " .. output)
+    end),
+  }):start()
+end
+
+---@param pr_number integer
+function M.util_checkout_pr_sync(pr_number)
+  Job:new({
+    enable_recording = true,
+    command = "gh",
+    args = { "pr", "checkout", pr_number },
+    on_exit = vim.schedule_wrap(function()
+      local output = vim.fn.system "git branch --show-current"
+      utils.info("Switched to " .. output)
+    end),
+  }):sync()
+end
+
+---@param pr_number integer
+function M.util_merge_pr(pr_number)
+  Job:new({
+    enable_recording = true,
+    command = "gh",
+    args = { "pr", "merge", pr_number, "--merge", "--delete-branch" },
+    on_exit = vim.schedule_wrap(function()
+      utils.info("Merged PR " .. pr_number .. "!")
+    end),
+  }):start()
+end
+
+---@param repo string
+function M.util_get_repo_iid(repo)
+  local owner, name = utils.split_repo(repo)
+  local query = graphql("repository_id_query", owner, name)
+
+  local output = cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    mode = "sync",
+  }
+  local resp = vim.fn.json_decode(output)
+  return resp.data.repository.id
+end
+
+---@param repo string
+function M.util_get_repo_info(repo)
+  local owner, name = utils.split_repo(repo)
+  local query = graphql("repository_query", owner, name)
+
+  return cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    mode = "sync",
+  }
+end
+
+---@param repo string
+function M.util_get_repo_templates(repo)
+  local owner, name = utils.split_repo(repo)
+  local query = graphql("repository_templates_query", owner, name)
+
+  return cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    mode = "sync",
+  }
+end
+
+---@param repo string
+---@param commit string
+---@param path string
+---@param cb function
+function M.util_get_file_contents(repo, commit, path, cb)
+  local owner, name = utils.split_repo(repo)
+  local query = graphql("file_content_query", owner, name, commit, path)
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        utils.error(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output)
+        local blob = resp.data.repository.object
+        local lines = {}
+        if blob and blob ~= vim.NIL and type(blob.text) == "string" then
+          lines = vim.split(blob.text, "\n")
+        end
+        cb(lines)
+      end
+    end,
+  }
+end
+
+---@param repo string
+function M.util_fork(repo)
+  -- TODO: replace gh
+  utils.info(vim.fn.system('echo "n" | gh repo fork ' .. repo .. " 2>&1 | cat "))
+end
+
+---@param cb function
+function M.util_get_pr_for_curr_branch(cb)
+  cli.run {
+    args = { "pr", "status", "--json", "id,number,headRepositoryOwner,headRepository" },
+    cb = function(out)
+      local pr = vim.fn.json_decode(out)
+      if pr.currentBranch and pr.currentBranch.number then
+        local number = pr.currentBranch.number
+        local id = pr.currentBranch.id
+        local owner = pr.currentBranch.headRepositoryOwner.login
+        local name = pr.currentBranch.headRepository.name
+        local query = graphql("pull_request_query", owner, name, number, _G.octo_pv2_fragment)
+
+        cli.run {
+          args = { "api", "graphql", "--paginate", "--jq", ".", "-f", string.format("query=%s", query) },
+          cb = function(output, stderr)
+            if stderr and not utils.is_blank(stderr) then
+              vim.api.nvim_err_writeln(stderr)
+            elseif output then
+              local resp = utils.aggregate_pages(output, "data.repository.pullRequest.timelineItems.nodes")
+              local obj = resp.data.repository.pullRequest
+              local Rev = require("octo.reviews.rev").Rev
+              local PullRequest = require("octo.model.pull-request").PullRequest
+              local pull_request = PullRequest:new {
+                repo = owner .. "/" .. name,
+                number = number,
+                id = id,
+                left = Rev:new(obj.baseRefOid),
+                right = Rev:new(obj.headRefOid),
+                files = obj.files.nodes,
+              }
+              cb(pull_request)
+            end
+          end,
+        }
+      end
+    end,
+  }
+end
+
+---@param login string
+function M.util_get_user_id(login)
+  local query = graphql("user_query", login)
+
+ return cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    mode = "sync",
+  }
+end
+
+---@param repo string
+function M.util_get_label_id(repo)
+  local owner, name = utils.split_repo(repo)
+  local query = graphql("repo_labels_query", owner, name)
+
+  return cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    mode = "sync",
+  }
+end
+
 return M
