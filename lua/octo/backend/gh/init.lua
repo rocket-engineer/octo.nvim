@@ -46,6 +46,10 @@ M.functions = {
   ["open_in_browser"] = commands.open_in_browser,
   ["go_to_issue"] = commands.go_to_issue,
   ["file_toggle_viewed"] = commands.file_toggle_viewed,
+  ["review_start_review_mutation"] = commands.review_start_review_mutation,
+  ["review_retrieve"] = commands.review_retrieve,
+  ["review_discard"] = commands.review_discard,
+  ["review_submit"] = commands.review_submit,
 }
 
 return M

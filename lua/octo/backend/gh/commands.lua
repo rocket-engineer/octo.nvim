@@ -1452,4 +1452,115 @@ function M.file_toggle_viewed(file)
   }
 end
 
+
+-- -----------------------------------------------------------------------------
+-- Functions for octo/reviews/init.lua
+-- -----------------------------------------------------------------------------
+
+---@param pr_id string
+---@param cb any
+function M.review_start_review_mutation(pr_id, cb)
+  local query = graphql("start_review_mutation", pr_id)
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        utils.error(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output)
+        cb(resp)
+      end
+    end,
+  }
+end
+
+---@param pull_request PullRequest
+---@param cb any
+function M.review_retrieve(pull_request, cb)
+  local query = graphql("pending_review_threads_query", pull_request.owner, pull_request.name, pull_request.number)
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        utils.error(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output)
+        cb(resp)
+      end
+    end,
+  }
+end
+
+---@param review Review
+function M.review_discard(review)
+  local query = graphql(
+    "pending_review_threads_query",
+    review.pull_request.owner,
+    review.pull_request.name,
+    review.pull_request.number
+  )
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        vim.error(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output)
+        if #resp.data.repository.pullRequest.reviews.nodes == 0 then
+          utils.error "No pending reviews found"
+          return
+        end
+        review.id = resp.data.repository.pullRequest.reviews.nodes[1].id
+
+        local choice = vim.fn.confirm("All pending comments will get deleted, are you sure?", "&Yes\n&No\n&Cancel", 2)
+        if choice == 1 then
+          local delete_query = graphql("delete_pull_request_review_mutation", review.id)
+
+          cli.run {
+            args = { "api", "graphql", "-f", string.format("query=%s", delete_query) },
+            cb = function(output, stderr)
+              if stderr and not utils.is_blank(stderr) then
+                vim.error(stderr)
+              elseif output then
+                review.id = -1
+                review.threads = {}
+                review.files = {}
+                utils.info "Pending review discarded"
+                vim.cmd [[tabclose]]
+              end
+            end,
+          }
+        end
+      end
+    end,
+  }
+end
+
+---@param id integer
+---@param layout Layout
+---@param event string
+function M.review_submit(id, layout, event)
+  local bufnr = vim.api.nvim_get_current_buf()
+  local winid = vim.api.nvim_get_current_win()
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local body = utils.escape_char(utils.trim(table.concat(lines, "\n")))
+  local query = graphql("submit_pull_request_review_mutation", id, event, body, { escape = false })
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        utils.error(stderr)
+      elseif output then
+        utils.info "Review was submitted successfully!"
+        pcall(vim.api.nvim_win_close, winid, 0)
+        layout:close()
+      end
+    end,
+  }
+end
+
 return M
