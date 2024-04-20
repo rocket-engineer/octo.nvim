@@ -1415,4 +1415,41 @@ function M.go_to_issue(repo, number)
   }
 end
 
+
+-- -----------------------------------------------------------------------------
+-- Functions for octo/reviews/file-entry.lua
+-- -----------------------------------------------------------------------------
+
+---@param file FileEntry
+function M.file_toggle_viewed(file)
+  local query, next_state
+  if file.viewed_state == "VIEWED" then
+    query = graphql("unmark_file_as_viewed_mutation", file.path, file.pull_request.id)
+    next_state = "UNVIEWED"
+  elseif file.viewed_state == "UNVIEWED" then
+    query = graphql("mark_file_as_viewed_mutation", file.path, file.pull_request.id)
+    next_state = "VIEWED"
+  elseif file.viewed_state == "DISMISSED" then
+    query = graphql("mark_file_as_viewed_mutation", file.path, file.pull_request.id)
+    next_state = "VIEWED"
+  end
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        vim.api.nvim_err_writeln(stderr)
+      elseif output then
+        --local resp = vim.fn.json_decode(output)
+        file.viewed_state = next_state
+        local current_review = require("octo.reviews").get_current_review()
+        if current_review then
+          current_review.layout.file_panel:render()
+          current_review.layout.file_panel:redraw()
+        end
+      end
+    end,
+  }
+end
+
 return M

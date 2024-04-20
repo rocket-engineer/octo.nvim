@@ -45,6 +45,7 @@ M.functions = {
   ["pr_get_commit_changed_files"] = commands.pr_get_commit_changed_files,
   ["open_in_browser"] = commands.open_in_browser,
   ["go_to_issue"] = commands.go_to_issue,
+  ["file_toggle_viewed"] = commands.file_toggle_viewed,
 }
 
 return M
