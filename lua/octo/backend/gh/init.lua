@@ -31,6 +31,15 @@ M.functions = {
   ["cmds_remove_label"] = commands.cmds_remove_label,
   ["cmds_add_user"] = commands.cmds_add_user,
   ["cmds_remove_assignee"] = commands.cmds_remove_assignee,
+  ["buffer_fetch_taggable_users"] = commands.buffer_fetch_taggable_users,
+  ["buffer_fetch_issues"] = commands.buffer_fetch_issues,
+  ["buffer_save_title_and_body"] = commands.buffer_save_title_and_body,
+  ["buffer_add_issue_comment"] = commands.buffer_add_issue_comment,
+  ["buffer_add_thread_comment"] = commands.buffer_add_thread_comment,
+  ["buffer_pr_add_thread"] = commands.buffer_pr_add_thread,
+  ["buffer_commit_add_thread"] = commands.buffer_commit_add_thread,
+  ["buffer_add_pr_comment"] = commands.buffer_add_pr_comment,
+  ["buffer_update_comment"] = commands.buffer_update_comment,
 }
 
 return M

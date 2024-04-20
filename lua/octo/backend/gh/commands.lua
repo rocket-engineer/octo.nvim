@@ -866,4 +866,398 @@ function M.cmds_remove_assignee(buffer, bufnr, iid, user_id)
   }
 end
 
+
+-- -----------------------------------------------------------------------------
+-- Functions for model/octo-buffer.lua
+-- -----------------------------------------------------------------------------
+
+-- TODO: Add repo contributors
+---@param repo string
+---@param users table
+function M.buffer_fetch_taggable_users(repo, users)
+  cli.run {
+    args = { "api", string.format("repos/%s/contributors", repo) },
+    cb = function(response)
+      if not utils.is_blank(response) then
+        local resp = vim.fn.json_decode(response)
+        for _, contributor in ipairs(resp) do
+          table.insert(users, contributor.login)
+        end
+        -- TODO: self.taggable_users = users
+      end
+    end,
+  }
+end
+
+---Fetches the issues in the repo so they can be used for completion.
+---@param repo string
+function M.buffer_fetch_issues(repo)
+  cli.run {
+    args = { "api", string.format("repos/%s/issues", repo) },
+    cb = function(response)
+      local issues_metadata = {}
+      local resp = vim.fn.json_decode(response)
+      for _, issue in ipairs(resp) do
+        table.insert(issues_metadata, { number = issue.number, title = issue.title })
+      end
+      octo_repo_issues[repo] = issues_metadata
+    end,
+  }
+end
+
+---@param buffer OctoBuffer
+---@param id string
+---@param title_metadata TitleMetadata
+---@param desc_metadata BodyMetadata
+function M.buffer_save_title_and_body(buffer, id, title_metadata, desc_metadata)
+  local query
+  if buffer:isIssue() then
+    query = graphql("update_issue_mutation", id, title_metadata.body, desc_metadata.body)
+  elseif buffer:isPullRequest() then
+    query = graphql("update_pull_request_mutation", id, title_metadata.body, desc_metadata.body)
+  end
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        vim.api.nvim_err_writeln(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output)
+        local obj
+        if buffer:isPullRequest() then
+          obj = resp.data.updatePullRequest.pullRequest
+        elseif buffer:isIssue() then
+          obj = resp.data.updateIssue.issue
+        end
+        if title_metadata.body == obj.title then
+          title_metadata.savedBody = obj.title
+          title_metadata.dirty = false
+          buffer.titleMetadata = title_metadata
+        end
+
+        if desc_metadata.body == obj.body then
+          desc_metadata.savedBody = obj.body
+          desc_metadata.dirty = false
+          buffer.bodyMetadata = desc_metadata
+        end
+
+        buffer:render_signcolumn()
+        utils.info "Saved!"
+      end
+    end,
+  }
+end
+
+---@param buffer OctoBuffer
+---@param id string
+---@param comment_metadata CommentMetadata
+function M.buffer_add_issue_comment(buffer, id, comment_metadata)
+  local query = graphql("add_issue_comment_mutation", id, comment_metadata.body)
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        vim.api.nvim_err_writeln(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output)
+        local respBody = resp.data.addComment.commentEdge.node.body
+        local respId = resp.data.addComment.commentEdge.node.id
+        if utils.trim(comment_metadata.body) == utils.trim(respBody) then
+          local comments = buffer.commentsMetadata
+          for i, c in ipairs(comments) do
+            if tonumber(c.id) == -1 then
+              comments[i].id = respId
+              comments[i].savedBody = respBody
+              comments[i].dirty = false
+              break
+            end
+          end
+          buffer:render_signcolumn()
+        end
+      end
+    end,
+  }
+end
+
+---Create new thread reply
+---@param buffer OctoBuffer
+---@param comment_metadata CommentMetadata
+function M.buffer_add_thread_comment(buffer, comment_metadata)
+  local query = graphql(
+    "add_pull_request_review_comment_mutation",
+    comment_metadata.replyTo,
+    comment_metadata.body,
+    comment_metadata.reviewId
+  )
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        vim.api.nvim_err_writeln(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output)
+        local resp_comment = resp.data.addPullRequestReviewComment.comment
+        local comment_end
+        if utils.trim(comment_metadata.body) == utils.trim(resp_comment.body) then
+          local comments = buffer.commentsMetadata
+          for i, c in ipairs(comments) do
+            if tonumber(c.id) == -1 then
+              comments[i].id = resp_comment.id
+              comments[i].savedBody = resp_comment.body
+              comments[i].dirty = false
+              comment_end = comments[i].endLine
+              break
+            end
+          end
+
+          local threads = resp_comment.pullRequest.reviewThreads.nodes
+          local review = require("octo.reviews").get_current_review()
+          if review then
+            review:update_threads(threads)
+          end
+
+          buffer:render_signcolumn()
+
+          -- update thread map
+          local thread_id
+          for _, thread in ipairs(threads) do
+            for _, c in ipairs(thread.comments.nodes) do
+              if c.id == resp_comment.id then
+                thread_id = thread.id
+                break
+              end
+            end
+          end
+          local mark_id
+          for markId, threadMetadata in pairs(buffer.threadsMetadata) do
+            if threadMetadata.threadId == thread_id then
+              mark_id = markId
+            end
+          end
+          local extmark = vim.api.nvim_buf_get_extmark_by_id(
+            buffer.bufnr,
+            constants.OCTO_THREAD_NS,
+            tonumber(mark_id),
+            { details = true }
+          )
+          local thread_start = extmark[1]
+          -- update extmark
+          vim.api.nvim_buf_del_extmark(buffer.bufnr, constants.OCTO_THREAD_NS, tonumber(mark_id))
+          local thread_mark_id = vim.api.nvim_buf_set_extmark(buffer.bufnr, constants.OCTO_THREAD_NS, thread_start, 0, {
+            end_line = comment_end + 2,
+            end_col = 0,
+          })
+          buffer.threadsMetadata[tostring(thread_mark_id)] = buffer.threadsMetadata[tostring(mark_id)]
+          buffer.threadsMetadata[tostring(mark_id)] = nil
+        end
+      end
+    end,
+  }
+end
+
+---Basic Thread/Comment without code?
+---@param buffer OctoBuffer
+---@param comment_metadata CommentMetadata
+---@param review Review
+---@param isMultiline boolean
+function M.buffer_pr_add_thread(buffer, comment_metadata, review, isMultiline)
+  local query
+  if isMultiline then
+    query = graphql(
+      "add_pull_request_review_multiline_thread_mutation",
+      comment_metadata.reviewId,
+      comment_metadata.body,
+      comment_metadata.path,
+      comment_metadata.diffSide,
+      comment_metadata.diffSide,
+      comment_metadata.snippetStartLine,
+      comment_metadata.snippetEndLine
+    )
+  else
+    query = graphql(
+      "add_pull_request_review_thread_mutation",
+      comment_metadata.reviewId,
+      comment_metadata.body,
+      comment_metadata.path,
+      comment_metadata.diffSide,
+      comment_metadata.snippetStartLine
+    )
+  end
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        vim.api.nvim_err_writeln(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output).data.addPullRequestReviewThread
+        if not utils.is_blank(resp.thread) then
+          local new_comment = resp.thread.comments.nodes[1]
+          if utils.trim(comment_metadata.body) == utils.trim(new_comment.body) then
+            local comments = buffer.commentsMetadata
+            for i, c in ipairs(comments) do
+              if tonumber(c.id) == -1 then
+                comments[i].id = new_comment.id
+                comments[i].savedBody = new_comment.body
+                comments[i].dirty = false
+                break
+              end
+            end
+            local threads = resp.thread.pullRequest.reviewThreads.nodes
+            if review then
+              review:update_threads(threads)
+            end
+            buffer:render_signcolumn()
+          end
+        else
+          utils.error "Failed to create thread"
+          return
+        end
+      end
+    end,
+  }
+end
+
+---@param buffer OctoBuffer
+---@param comment_metadata CommentMetadata
+---@param review Review
+---@param position integer
+function M.buffer_commit_add_thread(buffer, comment_metadata, review, position)
+  local query = graphql(
+    "add_pull_request_review_commit_thread_mutation",
+    review.layout.right.commit,
+    comment_metadata.body,
+    comment_metadata.reviewId,
+    comment_metadata.path,
+    position
+  )
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        vim.api.nvim_err_writeln(stderr)
+      elseif output then
+        local r = vim.fn.json_decode(output)
+        local resp = r.data.addPullRequestReviewComment
+        if not utils.is_blank(resp.comment) then
+          if utils.trim(comment_metadata.body) == utils.trim(resp.comment.body) then
+            local comments = buffer.commentsMetadata
+            for i, c in ipairs(comments) do
+              if tonumber(c.id) == -1 then
+                comments[i].id = resp.comment.id
+                comments[i].savedBody = resp.comment.body
+                comments[i].dirty = false
+                break
+              end
+            end
+            if review then
+              local threads = resp.comment.pullRequest.reviewThreads.nodes
+              review:update_threads(threads)
+            end
+            buffer:render_signcolumn()
+          end
+        else
+          utils.error "Failed to create thread"
+          return
+        end
+      end
+    end,
+  }
+end
+
+---@param buffer OctoBuffer
+---@param comment_metadata CommentMetadata
+function M.buffer_add_pr_comment(buffer, comment_metadata)
+  cli.run {
+    args = {
+      "api",
+      "--method",
+      "POST",
+      string.format("/repos/%s/pulls/%d/comments/%s/replies", buffer.repo, buffer.number, comment_metadata.replyToRest),
+      "-f",
+      string.format([[body=%s]], utils.escape_char(comment_metadata.body)),
+      "--jq",
+      ".",
+    },
+    headers = { "Accept: application/vnd.github.v3+json" },
+    cb = function(output, stderr)
+      if not utils.is_blank(stderr) then
+        utils.error(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output)
+        if not utils.is_blank(resp) then
+          if utils.trim(comment_metadata.body) == utils.trim(resp.body) then
+            local comments = buffer.commentsMetadata
+            for i, c in ipairs(comments) do
+              if tonumber(c.id) == -1 then
+                comments[i].id = resp.id
+                comments[i].savedBody = resp.body
+                comments[i].dirty = false
+                break
+              end
+            end
+            buffer:render_signcolumn()
+          end
+        else
+          utils.error "Failed to create thread"
+          return
+        end
+      end
+    end,
+  }
+end
+
+---@param buffer OctoBuffer
+---@param comment_metadata CommentMetadata
+function M.buffer_update_comment(buffer, comment_metadata)
+  local update_query
+  if comment_metadata.kind == "IssueComment" then
+    update_query = graphql("update_issue_comment_mutation", comment_metadata.id, comment_metadata.body)
+  elseif comment_metadata.kind == "PullRequestReviewComment" then
+    update_query = graphql("update_pull_request_review_comment_mutation", comment_metadata.id, comment_metadata.body)
+  elseif comment_metadata.kind == "PullRequestReview" then
+    update_query = graphql("update_pull_request_review_mutation", comment_metadata.id, comment_metadata.body)
+  end
+
+  cli.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", update_query) },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        vim.api.nvim_err_writeln(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output)
+        local resp_comment
+        if comment_metadata.kind == "IssueComment" then
+          resp_comment = resp.data.updateIssueComment.issueComment
+        elseif comment_metadata.kind == "PullRequestReviewComment" then
+          resp_comment = resp.data.updatePullRequestReviewComment.pullRequestReviewComment
+          local threads =
+            resp.data.updatePullRequestReviewComment.pullRequestReviewComment.pullRequest.reviewThreads.nodes
+          local review = require("octo.reviews").get_current_review()
+          if review then
+            review:update_threads(threads)
+          end
+        elseif comment_metadata.kind == "PullRequestReview" then
+          resp_comment = resp.data.updatePullRequestReview.pullRequestReview
+        end
+        if resp_comment and utils.trim(comment_metadata.body) == utils.trim(resp_comment.body) then
+          local comments = buffer.commentsMetadata
+          for i, c in ipairs(comments) do
+            if c.id == comment_metadata.id then
+              comments[i].savedBody = comment_metadata.body
+              comments[i].dirty = false
+              break
+            end
+          end
+          buffer:render_signcolumn()
+        end
+      end
+    end,
+  }
+end
+
 return M
