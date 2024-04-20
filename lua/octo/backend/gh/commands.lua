@@ -1260,4 +1260,95 @@ function M.buffer_update_comment(buffer, comment_metadata)
   }
 end
 
+
+-- -----------------------------------------------------------------------------
+-- Functions for model/pull_request.lua
+-- -----------------------------------------------------------------------------
+
+---@param repo string
+---@param number integer IID
+function M.pr_get_diff(repo, number)
+  local url = string.format("repos/%s/pulls/%d", repo, number)
+
+  cli.run {
+    args = { "api", "--paginate", url },
+    headers = { "Accept: application/vnd.github.v3.diff" },
+    mode = "sync",
+  }
+end
+
+---@param pr PullRequest
+---@param cb function
+function M.pr_get_changed_files(pr, cb)
+  local url = string.format("repos/%s/pulls/%d/files", pr.repo, pr.number)
+
+  cli.run {
+    args = { "api", "--paginate", url, "--jq", "." },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        utils.error(stderr)
+      elseif output then
+        local FileEntry = require("octo.reviews.file-entry").FileEntry
+        local results = vim.fn.json_decode(output)
+        local files = {}
+        for _, result in ipairs(results) do
+          local entry = FileEntry:new {
+            path = result.filename,
+            previous_path = result.previous_filename,
+            patch = result.patch,
+            pull_request = pr,
+            status = utils.file_status_map[result.status],
+            stats = {
+              additions = result.additions,
+              deletions = result.deletions,
+              changes = result.changes,
+            },
+          }
+          table.insert(files, entry)
+        end
+        cb(files)
+      end
+    end,
+  }
+end
+
+---Ongoing review: Octo review commit
+---@param pr PullRequest
+---@param rev Rev
+---@param cb function
+function M.pr_get_commit_changed_files(pr, rev, cb)
+  local url = string.format("repos/%s/commits/%s", pr.repo, rev.commit)
+
+  cli.run {
+    args = { "api", "--paginate", url, "--jq", "." },
+    cb = function(output, stderr)
+      if stderr and not utils.is_blank(stderr) then
+        utils.error(stderr)
+      elseif output then
+        local FileEntry = require("octo.reviews.file-entry").FileEntry
+        local results = vim.fn.json_decode(output)
+        local files = {}
+        if results.files then
+          for _, result in ipairs(results.files) do
+            local entry = FileEntry:new {
+              path = result.filename,
+              previous_path = result.previous_filename,
+              patch = result.patch,
+              pull_request = pr,
+              status = utils.file_status_map[result.status],
+              stats = {
+                additions = result.additions,
+                deletions = result.deletions,
+                changes = result.changes,
+              },
+            }
+            table.insert(files, entry)
+          end
+          cb(files)
+        end
+      end
+    end,
+  }
+end
+
 return M

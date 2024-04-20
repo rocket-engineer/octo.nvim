@@ -40,6 +40,9 @@ M.functions = {
   ["buffer_commit_add_thread"] = commands.buffer_commit_add_thread,
   ["buffer_add_pr_comment"] = commands.buffer_add_pr_comment,
   ["buffer_update_comment"] = commands.buffer_update_comment,
+  ["pr_get_diff"] = commands.pr_get_diff,
+  ["pr_get_changed_files"] = commands.pr_get_changed_files,
+  ["pr_get_commit_changed_files"] = commands.pr_get_commit_changed_files,
 }
 
 return M
