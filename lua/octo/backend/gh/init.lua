@@ -43,6 +43,8 @@ M.functions = {
   ["pr_get_diff"] = commands.pr_get_diff,
   ["pr_get_changed_files"] = commands.pr_get_changed_files,
   ["pr_get_commit_changed_files"] = commands.pr_get_commit_changed_files,
+  ["open_in_browser"] = commands.open_in_browser,
+  ["go_to_issue"] = commands.go_to_issue,
 }
 
 return M
