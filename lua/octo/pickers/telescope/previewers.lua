@@ -1,11 +1,11 @@
 local OctoBuffer = require("octo.model.octo-buffer").OctoBuffer
-local backend = require "octo.backend"
 local writers = require "octo.ui.writers"
 local previewers = require "telescope.previewers"
 local ts_utils = require "telescope.utils"
 local defaulter = ts_utils.make_default_callable
 
 local issue = defaulter(function(opts)
+  local backend = require "octo.backend"
   return previewers.new_buffer_previewer {
     title = opts.preview_title,
     get_buffer_by_name = function(_, entry)
@@ -45,6 +45,7 @@ local gist = defaulter(function(opts)
 end)
 
 local commit = defaulter(function(opts)
+  local backend = require "octo.backend"
   return previewers.new_buffer_previewer {
     title = opts.preview_title,
     keep_last_buf = true,

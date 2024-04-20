@@ -1,6 +1,7 @@
 local cli = require "octo.backend.gh.cli"
 local commands = require "octo.backend.gh.commands"
 local telescope_commands = require "octo.backend.gh.telescope-commands"
+-- local fzf_lua_commands = require "octo.backend.gh.fzf-lua-commands"
 
 local M = {}
 
@@ -78,6 +79,24 @@ M.functions = {
   ["telescope_get_users"] = telescope_commands.telescope_get_users,
   ["telescope_select_assignee"] = telescope_commands.telescope_select_assignee,
   ["telescope_repos"] = telescope_commands.telescope_repos,
+  -- ["fzf_lua_default_issue"] = fzf_lua_commands.fzf_lua_default_issue,
+  -- ["fzf_lua_previewer_search"] = fzf_lua_commands.fzf_lua_previewer_search,
+  -- ["fzf_lua_default_commit"] = fzf_lua_commands.fzf_lua_default_commit,
+  -- ["fzf_lua_previewer_repos"] = fzf_lua_commands.fzf_lua_previewer_repos,
+  -- ["fzf_lua_issues"] = fzf_lua_commands.fzf_lua_issues,
+  -- ["fzf_lua_gists"] = fzf_lua_commands.fzf_lua_gists,
+  -- ["fzf_lua_pull_requests"] = fzf_lua_commands.fzf_lua_pull_requests,
+  -- ["fzf_lua_commits"] = fzf_lua_commands.fzf_lua_commits,
+  -- ["fzf_lua_review_commits"] = fzf_lua_commands.fzf_lua_review_commits,
+  -- ["fzf_lua_changed_files"] = fzf_lua_commands.fzf_lua_changed_files,
+  -- ["fzf_lua_search"] = fzf_lua_commands.fzf_lua_search,
+  -- ["fzf_lua_select_target_project_column"] = fzf_lua_commands.fzf_lua_select_target_project_column,
+  -- ["fzf_lua_select_target_project_column_v2"] = fzf_lua_commands.fzf_lua_select_target_project_column_v2,
+  -- ["fzf_lua_select_label"] = fzf_lua_commands.fzf_lua_select_label,
+  -- ["fzf_lua_select_assigned_label"] = fzf_lua_commands.fzf_lua_select_assigned_label,
+  -- ["fzf_lua_get_users"] = fzf_lua_commands.fzf_lua_get_users,
+  -- ["fzf_lua_select_assignee"] = fzf_lua_commands.fzf_lua_select_assignee,
+  -- ["fzf_lua_repos"] = fzf_lua_commands.fzf_lua_repos,
 }
 
 return M
