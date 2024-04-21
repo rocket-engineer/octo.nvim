@@ -1,7 +1,6 @@
 local config = require "octo.config"
 local constants = require "octo.constants"
 local date = require "octo.date"
-local backend = require "octo.backend"
 local _, Job = pcall(require, "plenary.job")
 local vim = vim
 
@@ -312,6 +311,7 @@ function M.checkout_pr(pr_number)
     return
   end
 
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["util_checkout_pr"]
   func(pr_number)
 end
@@ -321,6 +321,7 @@ function M.checkout_pr_sync(pr_number)
     return
   end
 
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["util_checkout_pr_sync"]
   func(pr_number)
 end
@@ -331,6 +332,7 @@ function M.merge_pr(pr_number)
     return
   end
 
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["util_merge_pr"]
   func(pr_number)
 end
@@ -363,8 +365,10 @@ function M.get_repo_id(repo)
   if repo_id_cache[repo] then
     return repo_id_cache[repo]
   else
+    local backend = require "octo.backend"
     local func = backend.get_funcs()["util_get_repo_iid"]
     local id = func(repo)
+
     repo_id_cache[repo] = id
     return id
   end
@@ -383,8 +387,10 @@ function M.get_repo_info(repo)
   if repo_info_cache[repo] then
     return repo_info_cache[repo]
   else
+    local backend = require "octo.backend"
     local func = backend.get_funcs()["util_get_repo_info"]
     local output = func(repo)
+
     local resp = vim.fn.json_decode(output)
     local info = resp.data.repository
     repo_info_cache[repo] = info
@@ -397,6 +403,7 @@ function M.get_repo_templates(repo)
   if repo_templates_cache[repo] then
     return repo_templates_cache[repo]
   else
+    local backend = require "octo.backend"
     local func = backend.get_funcs()["util_get_repo_templates"]
     local output = func(repo)
     local resp = vim.fn.json_decode(output)
@@ -564,6 +571,7 @@ end
 ---@param path string
 ---@param cb function
 function M.get_file_contents(repo, commit, path, cb)
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["util_get_file_contents"]
   func(repo, commit, path, cb)
 end
@@ -1008,6 +1016,8 @@ function M.fork_repo()
     return
   end
   M.info(string.format("Cloning %s. It can take a few minutes", buffer.repo))
+
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["util_fork"]
   func(buffer.repo)
 end
@@ -1032,6 +1042,7 @@ function M.error(msg)
 end
 
 function M.get_pull_request_for_current_branch(cb)
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["util_get_pr_for_curr_branch"]
   func(cb)
 end
@@ -1080,8 +1091,10 @@ function M.close_preview_autocmd(events, winnr, bufnrs)
 end
 
 function M.get_user_id(login)
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["util_get_user_id"]
   local output = func(login)
+
   if output then
     local resp = vim.fn.json_decode(output)
     if resp.data.user and resp.data.user ~= vim.NIL then
@@ -1098,8 +1111,10 @@ function M.get_label_id(label)
     return
   end
 
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["util_get_label_id"]
   local output = func(buffer.repo)
+
   if output then
     local resp = vim.fn.json_decode(output)
     if resp.data.repository.labels.nodes and resp.data.repository.labels.nodes ~= vim.NIL then

@@ -4,7 +4,6 @@ local autocmds = require "octo.autocmds"
 local config = require "octo.config"
 local constants = require "octo.constants"
 local folds = require "octo.folds"
-local backend = require "octo.backend"
 local signs = require "octo.ui.signs"
 local writers = require "octo.ui.writers"
 local utils = require "octo.utils"
@@ -271,12 +270,14 @@ function OctoBuffer:async_fetch_taggable_users()
     table.insert(users, c.author)
   end
 
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["buffer_fetch_taggable_users"]
   func(self.repo, users)
 end
 
 ---Fetches the issues in the repo so they can be used for completion.
 function OctoBuffer:async_fetch_issues()
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["buffer_fetch_issues"]
   func(self.repo)
 end
@@ -337,6 +338,7 @@ function OctoBuffer:do_save_title_and_body()
       return
     end
 
+    local backend = require "octo.backend"
     local func = backend.get_funcs()["buffer_save_title_and_body"]
     func(self, id, title_metadata, desc_metadata)
   end
@@ -346,12 +348,14 @@ end
 function OctoBuffer:do_add_issue_comment(comment_metadata)
   local id = self.node.id
 
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["buffer_add_issue_comment"]
   func(self, id, comment_metadata)
 end
 
 ---Replies to a review comment thread
 function OctoBuffer:do_add_thread_comment(comment_metadata)
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["buffer_add_thread_comment"]
   func(self, comment_metadata)
 end
@@ -376,6 +380,7 @@ function OctoBuffer:do_add_new_thread(comment_metadata)
 
   -- create new thread
   if review_level == "PR" then
+    local backend = require "octo.backend"
     local func = backend.get_funcs()["buffer_pr_add_thread"]
     func(self, comment_metadata, review, isMultiline)
   elseif review_level == "COMMIT" then
@@ -435,6 +440,7 @@ function OctoBuffer:do_add_new_thread(comment_metadata)
         position = position + offset - 1
       end
 
+      local backend = require "octo.backend"
       local func = backend.get_funcs()["buffer_commit_add_thread"]
       func(self, comment_metadata, review, position)
     end
@@ -449,12 +455,14 @@ function OctoBuffer:do_add_pull_request_comment(comment_metadata)
     return
   end
 
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["buffer_add_pr_comment"]
   func(self, comment_metadata)
 end
 
 ---Update a comment's metadata
 function OctoBuffer:do_update_comment(comment_metadata)
+  local backend = require "octo.backend"
   local func = backend.get_funcs()["buffer_update_comment"]
   func(self, comment_metadata)
 end
